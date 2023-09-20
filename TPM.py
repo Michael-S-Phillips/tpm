@@ -47,77 +47,78 @@ def TPM(di, li, flag, cap, tol, tlim):
     '''
 
     # Constants
-    Ab = 0.06
-    emis = 0.95
-    sigma = 5.670374419e-8
-    invab = 1 - Ab
-    lat = np.linspace(0, 89, 90)
-    
+    Ab = 0.06  # Albedo coefficient
+    emis = 0.95  # Emissivity coefficient
+    sigma = 5.670374419e-8  # Stefan-Boltzmann constant
+    invab = 1 - Ab  # Inverse albedo coefficient
+    lat = np.linspace(0, 89, 90)  # Latitudes array
+
     # Define depth-dependent density function
     if cap == 'regolith':
         rho = lambda z: 3100 * ((z + 0.122) / (z + 0.18))
     elif cap == 'basalt':
         rho = lambda z: 2840 + z * 10
-    
+
     # Thermal conductivity coefficients
-    l0 = 75e-6
-    l1 = l0 / 100
-    Beta0 = 4 * sigma * emis * l0
-    Beta1 = 4 * sigma * emis * l1
-    # Beta = np.linspace(Beta0,Beta1,N+2)
-    kcT = 4e-3
-    kcB = 7e-3
-    
+    l0 = 75e-6  # Coefficient for initial depth
+    l1 = l0 / 100  # Coefficient for final depth
+    Beta0 = 4 * sigma * emis * l0  # Initial thermal conductivity coefficient
+    Beta1 = 4 * sigma * emis * l1  # Final thermal conductivity coefficient
+    kcT = 4e-3  # Thermal conductivity coefficient for top layer
+    kcB = 7e-3  # Thermal conductivity coefficient for bottom layer
+
     def kT(T):
-        return kcT + Beta0 * T**3
-    
+        return kcT + Beta0 * T**3  # Thermal conductivity function
+
     # Confidence interval values for heat capacity coefficients
     CI = np.array([[-147.190898324622, 4.11951434554240, -0.00529042037670872, 2.42723186129553e-06, -4.75097411647327e-10],
-                   [-80.5149, 5.1360, -0.0087, 7.6388e-6, -2.3769e-9]])
-    
+                [-80.5149, 5.1360, -0.0087, 7.6388e-6, -2.3769e-9]])
+
     def cp(T):
-        return CI[1, 0] + CI[1, 1] * T + CI[1, 2] * T**2 + CI[1, 3] * T**3 + CI[1, 4] * T**4
-    
+        return CI[1, 0] + CI[1, 1] * T + CI[1, 2] * T**2 + CI[1, 3] * T**3 + CI[1, 4] * T**4  # Heat capacity function
+
     # Calculate thermal inertia parameters
-    CIrho, _ = quad(rho, 0, 10)
-    alpha0 = kT(700) / (CIrho * cp(700))
-    tao = 175.94 # Period of a solar day in earth days
-    dw = tpm_utils.skindepth(alpha0, tao)
-    dy = dw / di
-    
+    CIrho, _ = quad(rho, 0, 10)  # Density integral
+    alpha0 = kT(700) / (CIrho * cp(700))  # Thermal inertia parameter
+    tao = 175.94  # Period of a solar day in Earth days
+    dw = tpm_utils.skindepth(alpha0, tao)  # Skin depth
+    dy = dw / di  # Grid spacing
+
     # Initialize some variables
-    denergy = 0
-    dflux = 0
-    Tsum = 0
-    dtemp = 1
-    ind = 0
-    
+    denergy = 0  # Energy change
+    dflux = 0  # Flux change
+    Tsum = 0  # Sum of temperatures
+    dtemp = 1  # Temperature change
+    ind = 0  # Index counter
+
     # Set up grid parameters
-    L = dw / 10
-    n = int(np.ceil(L / dy))
-    h = L / n
-    
-    dyy = dy * 2
-    mL = 1.5 - L
-    mn = int(np.ceil(mL / dyy))
-    mh = mL / mn
-    
-    bb = 10
-    dy3 = dyy * 5
-    LL = bb - mL - L
-    nn = int(np.ceil(LL / dy3))
-    hh = LL / nn
-    
-    N = n + mn + nn
-    
+    L = dw / 10  # Length of top layer
+    n = int(np.ceil(L / dy))  # Number of grid points in top layer
+    h = L / n  # Grid spacing in top layer
+
+    dyy = dy * 2  # Grid spacing constant
+    mL = 1.5 - L  # Length of middle layer
+    mn = int(np.ceil(mL / dyy))  # Number of grid points in middle layer
+    mh = mL / mn  # Grid spacing in middle layer
+
+    bb = 10  # Length of bottom layer
+    dy3 = dyy * 5  # Grid spacing constant
+    LL = bb - mL - L  # Length of bottom two layers
+    nn = int(np.ceil(LL / dy3))  # Number of grid points in bottom two layers
+    hh = LL / nn  # Grid spacing in bottom two layers
+
+    N = n + mn + nn  # Total number of grid points
+
     x = np.concatenate([np.linspace(0, L, n + 1),
                         np.linspace(L + 0.5 * h, L + mL, mn + 1),
                         np.linspace(L + mL, L + mL + LL + 0.5 * hh, nn)])
-    x[0] = 1e-4
+    x[0] = 1e-4  # Set the first element of x as 1e-4
 
+    # thermal conductivity (no radiation)
     def ki(x, bb):
         return kcB - ((kcB - kcT) * ((rho(bb) - rho(x)) / (rho(bb) - rho(0))))
 
+    # radiative thermal conductivity empirical formula
     def kc(ki, Beta, T):
         return ki + Beta * T**3
 
@@ -187,9 +188,10 @@ def TPM(di, li, flag, cap, tol, tlim):
     dt = 60 * (rho(h) * cp(700) / (2 * (a0 + b0)))
     print(f'The time step is {dt} s')
 
-    tstep = int(np.ceil(taos / dt))
-    lon = np.linspace(0, 359, tstep)
-    a_lon = np.linspace(0, 2 * np.pi, tstep)
+    tstep = int(np.ceil(taos / dt))  # Number of time steps
+    lon = np.linspace(0, 359, tstep)  # Longitudes array
+    a_lon = np.linspace(0, 2 * np.pi, tstep)  # apparent longitudes array
+
 
     # Calculate orbital parameters for Mercury
     if flag == 'hot':
@@ -315,7 +317,7 @@ def TPM(di, li, flag, cap, tol, tlim):
     dflux = 0
     Tsum = 0
 
-    while (tkern < tlim * tstep) or (abs(dtemp) > tol and np.min(dT) > tol) or not hasattr(locals(), 'Tl_max'):
+    while (tkern < tlim * tstep) or (abs(dtemp) > tol and np.min(dT) > tol):
 
         # update the model time
         mtime = 1 + tkern % tstep
@@ -375,8 +377,10 @@ def TPM(di, li, flag, cap, tol, tlim):
         
         T1 = T[1]
         fenergy = lambda T0: Qs[li, mtime-1] - sigma * emis * (T0 ** 4) - (kc(ki(z[0], bb), Beta[0], T0) / dz[0]) * (T0 - T1)
-        r[0] = optimize.root_scalar(fenergy, bracket=[0, 1000]).root
-        # alternate T0 update
+        # r[0] = optimize.root_scalar(fenergy, bracket=[0, 1000]).root
+        # alternative way to calculate r[0]
+        # Calculate heat flux at the boundary using finite difference=
+        r[0] = T[0] + D[0] * fenergy(T[0])  
         
         if r[0] < 0:
             r[0] = 0
@@ -400,7 +404,7 @@ def TPM(di, li, flag, cap, tol, tlim):
         if mtime % sf == 0:
             Tsl[0, (mtime-1) // sf] = T[0]
             line.set_ydata(T)
-            ax.set_title(f'Temperature vs. Depth: Time {np.round(t/taos, 2)} Mercury Days\n min dT: {np.min(dT)}, tol: {tol}\n dtemp: {dtemp}, denergy: {denergy}\nkT: {kT(T[0])}, dflux: {dflux}\n tempgrad: {tempgrad}, radiated: {radiated}')
+            ax.set_title(f'Temperature vs. Depth: Time {np.round(t/taos, 2)} Mercury Days\n tkern: {tkern}, {tlim * tstep}\ncondition 1: {(tkern < tlim * tstep)}, condition 2: {(abs(dtemp) > tol and np.min(dT) > tol)}\nmin dT: {np.min(dT)}, tol: {tol}, r[0]: {np.round(r[0], 2)}\n dtemp: {dtemp}, denergy: {denergy}\nkT: {kT(T[0])}, dflux: {dflux}\n tempgrad: {tempgrad}, radiated: {radiated}')
             # ax.set_title(f'Temperature vs. Depth: Time {np.round(tkern/tstep, 2)} Mercury Days\n min dT: {np.min(dT)}, tol: {tol}\n dtemp: {dtemp}, r0: {r[0]}')
             display.display(plt.gcf())
             display.clear_output(wait=True)
@@ -427,10 +431,12 @@ def TPM(di, li, flag, cap, tol, tlim):
             if ind == tlim // 2:
                 Tl_2 = Tl
 
-        # Update Tdepth after 1 rotation
+        # Update Tdepth after 1 rotation, reset flux values
         if mtime % tstep == 0:
             tdguess = np.mean(Tsl)
             T[-nn:] = tdguess
+            denergy = 0
+            dflux = 0
 
         # Check progress every 30 rotations
         # if tkern % (30 * tstep) == 0:
