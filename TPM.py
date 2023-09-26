@@ -209,7 +209,7 @@ def TPM(di, li, flag, cap, tol, tlim):
     elif flag == 'warm':
         pd = 0.3075  # Perihelion distance in AU
         e = 0.206  # Eccentricity
-        af = 90 / 360  # The numerator is the longitude in °E
+        af = 270 / 360  # The numerator is the longitude in °E
         t1 = af * taos
         t2 = (1 + af) * taos
         d = np.linspace(t1, t2, tstep) / (3600 * 24)
@@ -284,7 +284,7 @@ def TPM(di, li, flag, cap, tol, tlim):
     # If you want to save all temperature profiles, use this:
     sf = 1
     Tsl = np.zeros((1, int(tstep / sf)))
-    l = np.linspace(0 + af, sidrotperday + af, len(Tsl))
+    l = np.linspace(0 + af, sidrotperday + af, Tsl.shape[1])
 
     # Making a vector to save every other temperature profile
     Tl_all = np.zeros((len(x), int(tstep / sf)))
@@ -316,6 +316,7 @@ def TPM(di, li, flag, cap, tol, tlim):
     denergy = 0
     dflux = 0
     Tsum = 0
+    dt_guess = 0
 
     while (tkern < tlim * tstep) or (abs(dtemp) > tol and np.min(dT) > tol):
 
@@ -377,10 +378,9 @@ def TPM(di, li, flag, cap, tol, tlim):
         
         T1 = T[1]
         fenergy = lambda T0: Qs[li, mtime-1] - sigma * emis * (T0 ** 4) - (kc(ki(z[0], bb), Beta[0], T0) / dz[0]) * (T0 - T1)
-        # r[0] = optimize.root_scalar(fenergy, bracket=[0, 1000]).root
-        # alternative way to calculate r[0]
-        # Calculate heat flux at the boundary using finite difference=
-        r[0] = T[0] + D[0] * fenergy(T[0])  
+        
+        # balance the energy equation using Newton's method
+        r[0] = optimize.root_scalar(fenergy, bracket=[0, 1000]).root
         
         if r[0] < 0:
             r[0] = 0
